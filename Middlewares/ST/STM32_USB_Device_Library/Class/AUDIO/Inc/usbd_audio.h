@@ -47,7 +47,7 @@
  #endif
 
  #ifndef USBD_AUDIO_VOL_DEFAULT
- #define USBD_AUDIO_VOL_DEFAULT                        0xA000U
+ #define USBD_AUDIO_VOL_DEFAULT                        USBD_AUDIO_VOL_MAX
  #endif
 
  // 3dB step resolution

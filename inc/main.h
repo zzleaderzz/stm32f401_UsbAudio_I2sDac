@@ -25,7 +25,6 @@ extern "C" {
 #endif
 
 #include "stm32f4xx_hal.h"
-#include "stm32f4xx_ll_dma.h"
 
 #include "usbd_core.h"
 #include "usbd_desc.h"
