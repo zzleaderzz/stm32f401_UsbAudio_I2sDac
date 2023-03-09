@@ -1,0 +1,7 @@
+build/
+doxygen/
+Doxyfile
+
+*.launch
+.settings/
+Debug/
