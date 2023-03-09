@@ -31,7 +31,7 @@ When the USB Audio DAC device is enumerated on plug-in, it reports its capabilit
 # Software Development Environment
 * Windows 10
 * STM32CubeIDE v1.12.0
-* STM32 F4 library v1.26.1
+* STM32 F4 library v1.27.1 (But with manual fixes in stm32f4xx_hal_pcd.c)
 * You can enable additional features:
   * Enable diagnostic printout on serial UART port 
 

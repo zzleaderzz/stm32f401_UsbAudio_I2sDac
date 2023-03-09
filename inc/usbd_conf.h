@@ -51,23 +51,17 @@
 #include <string.h>
 
 /* Common Config */
-#define USBD_MAX_NUM_INTERFACES               2 // Isn't interface different from alt_setting ?
-#define USBD_MAX_NUM_CONFIGURATION            1
-#define USBD_MAX_STR_DESC_SIZ                 0x100
-#define USBD_SUPPORT_USER_STRING              0 
-#define USBD_SELF_POWERED                     0
-#define USBD_DEBUG_LEVEL                      0
+#define USBD_MAX_NUM_INTERFACES                 2 // Isn't interface different from alt_setting ?
+#define USBD_MAX_NUM_CONFIGURATION              1
+#define USBD_MAX_STR_DESC_SIZ                   0x100
+#define USBD_SUPPORT_USER_STRING                0
+#define USBD_SELF_POWERED                       0
+#define USBD_DEBUG_LEVEL                        0
 
 /* AUDIO Class Config */
-#define USBD_AUDIO_FREQ_DEFAULT               96000
-#define USBD_AUDIO_FREQ_MAX                   96000
-#define USBD_AUDIO_BIT_DEPTH_DEFAULT 			24
-
-/* Memory management macros */   
-#define USBD_malloc               malloc
-#define USBD_free                 free
-#define USBD_memset               memset
-#define USBD_memcpy               memcpy
+#define USBD_AUDIO_FREQ_DEFAULT                 96000
+#define USBD_AUDIO_FREQ_MAX                     96000
+#define USBD_AUDIO_BIT_DEPTH_DEFAULT            24
     
 /* DEBUG macros */  
 #if (USBD_DEBUG_LEVEL > 0)

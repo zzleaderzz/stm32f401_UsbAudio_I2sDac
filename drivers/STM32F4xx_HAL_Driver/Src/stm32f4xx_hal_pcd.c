@@ -1432,19 +1432,13 @@ void HAL_PCD_IRQHandler(PCD_HandleTypeDef *hpcd)
     /* Handle Incomplete ISO IN Interrupt */
     if (__HAL_PCD_GET_FLAG(hpcd, USB_OTG_GINTSTS_IISOIXFR))
     {
-      for (epnum = 1U; epnum < hpcd->Init.dev_endpoints; epnum++)
-      {
-        RegVal = USBx_INEP(epnum)->DIEPCTL;
-
-        if ((hpcd->IN_ep[epnum].type == EP_TYPE_ISOC) &&
-            ((RegVal & USB_OTG_DIEPCTL_EPENA) == USB_OTG_DIEPCTL_EPENA))
-        {
-          hpcd->IN_ep[epnum].is_iso_incomplete = 1U;
-
-          /* Abort current transaction and disable the EP */
-          (void)HAL_PCD_EP_Abort(hpcd, (uint8_t)(epnum | 0x80U));
-        }
-      }
+      /* Keep application checking the corresponding Iso IN endpoint
+      causing the incomplete Interrupt */
+#if (USE_HAL_PCD_REGISTER_CALLBACKS == 1U)
+      hpcd->ISOINIncompleteCallback(hpcd, (uint8_t)epnum);
+#else
+      HAL_PCD_ISOINIncompleteCallback(hpcd, (uint8_t)epnum);
+#endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 
       __HAL_PCD_CLEAR_FLAG(hpcd, USB_OTG_GINTSTS_IISOIXFR);
     }
@@ -1452,25 +1446,13 @@ void HAL_PCD_IRQHandler(PCD_HandleTypeDef *hpcd)
     /* Handle Incomplete ISO OUT Interrupt */
     if (__HAL_PCD_GET_FLAG(hpcd, USB_OTG_GINTSTS_PXFR_INCOMPISOOUT))
     {
-      for (epnum = 1U; epnum < hpcd->Init.dev_endpoints; epnum++)
-      {
-        RegVal = USBx_OUTEP(epnum)->DOEPCTL;
-
-        if ((hpcd->OUT_ep[epnum].type == EP_TYPE_ISOC) &&
-            ((RegVal & USB_OTG_DOEPCTL_EPENA) == USB_OTG_DOEPCTL_EPENA) &&
-            ((RegVal & (0x1U << 16)) == (hpcd->FrameNumber & 0x1U)))
-        {
-          hpcd->OUT_ep[epnum].is_iso_incomplete = 1U;
-
-          USBx->GINTMSK |= USB_OTG_GINTMSK_GONAKEFFM;
-
-          if ((USBx->GINTSTS & USB_OTG_GINTSTS_BOUTNAKEFF) == 0U)
-          {
-            USBx_DEVICE->DCTL |= USB_OTG_DCTL_SGONAK;
-            break;
-          }
-        }
-      }
+      /* Keep application checking the corresponding Iso OUT endpoint
+      causing the incomplete Interrupt */
+#if (USE_HAL_PCD_REGISTER_CALLBACKS == 1U)
+      hpcd->ISOOUTIncompleteCallback(hpcd, (uint8_t)epnum);
+#else
+      HAL_PCD_ISOOUTIncompleteCallback(hpcd, (uint8_t)epnum);
+#endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 
       __HAL_PCD_CLEAR_FLAG(hpcd, USB_OTG_GINTSTS_PXFR_INCOMPISOOUT);
     }
