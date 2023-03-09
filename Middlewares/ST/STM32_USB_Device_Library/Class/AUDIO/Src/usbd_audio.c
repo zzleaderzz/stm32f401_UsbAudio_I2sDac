@@ -272,6 +272,11 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIE
     0x00,
 };
 
+volatile uint32_t AudioPacketSize = 0;
+volatile uint32_t audio_buf_writable_samples = 0;
+volatile uint8_t tmpbuf[1024];
+
+
 volatile uint32_t tx_flag = 1;
 volatile uint32_t is_playing = 0;
 volatile uint32_t all_ready = 0;
@@ -568,7 +573,7 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
     haudio->rd_ptr = AUDIO_TOTAL_BUF_SIZE - BSP_AUDIO_OUT_GetRemainingDataSize();
 
     // Calculate remaining writable buffer samples
-    uint32_t audio_buf_writable_samples = haudio->rd_ptr < haudio->wr_ptr ?
+    audio_buf_writable_samples = haudio->rd_ptr < haudio->wr_ptr ?
     		  (haudio->rd_ptr + AUDIO_TOTAL_BUF_SIZE - haudio->wr_ptr)/6 : (haudio->rd_ptr - haudio->wr_ptr)/6;
 
     // Monitor remaining writable buffer samples with LED
@@ -746,7 +751,6 @@ static inline int32_t USBD_AUDIO_Volume_Ctrl(int32_t sample, int32_t shift_3dB){
 // STM32 I2S peripheral uses a 16bit data register
 // => outgoing I2S transmit data buffer : uint16_t array
 // Each I2S stereo sample is encoded as {hi_L:mid_L}, {lo_L:0x00}, {hi_R:mid_R}, {lo_R:0x00}
-static uint8_t tmpbuf[1024];
 static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,  uint8_t epnum){
 	USBD_AUDIO_HandleTypeDef* haudio;
 	haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
@@ -755,6 +759,9 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,  uint8_t epnum){
 
 	if (all_ready == 1U && epnum == AUDIO_OUT_EP) {
 		uint32_t curr_length = USBD_GetRxCount(pdev, epnum);
+
+		AudioPacketSize = curr_length;
+
 		// Ignore strangely large packets
 		if (curr_length > AUDIO_OUT_PACKET_24B) {
 			curr_length = 0U;
