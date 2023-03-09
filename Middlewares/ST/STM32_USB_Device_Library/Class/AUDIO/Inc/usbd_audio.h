@@ -65,6 +65,14 @@
 #define USBD_MAX_NUM_INTERFACES                       1U
 #endif
 
+#ifndef AUDIO_HS_BINTERVAL
+#define AUDIO_HS_BINTERVAL                            0x01U
+#endif /* AUDIO_HS_BINTERVAL */
+
+#ifndef AUDIO_FS_BINTERVAL
+#define AUDIO_FS_BINTERVAL                            0x01U
+#endif /* AUDIO_FS_BINTERVAL */
+
 /* bEndpointAddress, see UAC 1.0 spec, p.61 */
 #define AUDIO_OUT_EP                                  0x01U
 #define AUDIO_IN_EP                                   0x81U
