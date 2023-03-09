@@ -275,6 +275,10 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIE
 volatile uint32_t AudioPacketSize = 0;
 volatile uint32_t audio_buf_writable_samples = 0;
 volatile uint8_t tmpbuf[1024];
+static USBD_AUDIO_HandleTypeDef USBD_AUDIO_ClassData;
+
+volatile uint32_t AudioIn_IncompleteCounter = 0;
+volatile uint32_t AudioIn_CompleteCounter = 0;
 
 
 volatile uint32_t tx_flag = 1;
@@ -312,6 +316,9 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
 {
   USBD_AUDIO_HandleTypeDef* haudio;
 
+  /* Allocate Audio structure */
+  pdev->pClassData = &USBD_AUDIO_ClassData;
+
   /* Open EP OUT */
   USBD_LL_OpenEP(pdev, AUDIO_OUT_EP, USBD_EP_TYPE_ISOC, AUDIO_OUT_PACKET_24B);
   pdev->ep_out[AUDIO_OUT_EP & 0xFU].is_used = 1U;
@@ -329,31 +336,26 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
    */
   tx_flag = 1U;
 
-  /* Allocate Audio structure */
-  pdev->pClassData = USBD_malloc(sizeof(USBD_AUDIO_HandleTypeDef));
+  haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
+  haudio->alt_setting = 0U;
+  haudio->offset = AUDIO_OFFSET_UNKNOWN;
+  haudio->wr_ptr = 0U;
+  haudio->rd_ptr = 0U;
+  haudio->rd_enable = 0U;
+  haudio->freq = USBD_AUDIO_FREQ_DEFAULT;
+  haudio->bit_depth = USBD_AUDIO_BIT_DEPTH_DEFAULT;
+  haudio->volume = USBD_AUDIO_VOL_DEFAULT;
+  haudio->vol_3dB_shift = USBD_AUDIO_Get_Vol3dB_Shift(USBD_AUDIO_VOL_DEFAULT);
+  haudio->mute = USBD_AUDIO_MUTE_DEFAULT;
 
-  if (pdev->pClassData == NULL) {
+  // Initialize the Audio output Hardware layer
+  if (((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(haudio->freq, haudio->volume, haudio->mute) != 0) {
     return USBD_FAIL;
-  } else {
-    haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
-    haudio->alt_setting = 0U;
-    haudio->offset = AUDIO_OFFSET_UNKNOWN;
-    haudio->wr_ptr = 0U;
-    haudio->rd_ptr = 0U;
-    haudio->rd_enable = 0U;
-    haudio->freq = USBD_AUDIO_FREQ_DEFAULT;
-    haudio->bit_depth = USBD_AUDIO_BIT_DEPTH_DEFAULT;
-    haudio->volume = USBD_AUDIO_VOL_DEFAULT;
-    haudio->vol_3dB_shift = USBD_AUDIO_Get_Vol3dB_Shift(USBD_AUDIO_VOL_DEFAULT);
-    haudio->mute = USBD_AUDIO_MUTE_DEFAULT;
-
-    // Initialize the Audio output Hardware layer
-    if (((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(haudio->freq, haudio->volume, haudio->mute) != 0) {
-      return USBD_FAIL;
-    }
-
-    USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, tmpbuf, AUDIO_OUT_PACKET_24B);
   }
+
+  // Start receiving first frame
+  USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, (uint8_t *)tmpbuf, AUDIO_OUT_PACKET_24B);
+
   return USBD_OK;
 }
 
@@ -364,8 +366,7 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
   * @param  cfgidx: Configuration index
   * @retval status
   */
-static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef* pdev,
-                                 uint8_t cfgidx)
+static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
 {
   /* Flush all endpoints */
   USBD_LL_FlushEP(pdev, AUDIO_OUT_EP);
@@ -385,7 +386,6 @@ static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef* pdev,
   /* DeInit physical Interface components */
   if (pdev->pClassData != NULL) {
     ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->DeInit(0U);
-    USBD_free(pdev->pClassData);
     pdev->pClassData = NULL;
   }
 
@@ -399,8 +399,7 @@ static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef* pdev,
   * @param  req: usb requests
   * @retval status
   */
-static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef* pdev,
-                                USBD_SetupReqTypedef* req)
+static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef* req)
 {
   USBD_AUDIO_HandleTypeDef* haudio;
   uint16_t len;
@@ -539,6 +538,8 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef* pdev,
   /* epnum is the lowest 4 bits of bEndpointAddress. See UAC 1.0 spec, p.61 */
   if (epnum == (AUDIO_IN_EP & 0xf)) {
     tx_flag = 0U;
+
+    AudioIn_CompleteCounter++;
   }
   return USBD_OK;
 }
@@ -689,6 +690,10 @@ static uint8_t USBD_AUDIO_IsoINIncomplete(USBD_HandleTypeDef* pdev, uint8_t epnu
   uint32_t USBx_BASE = (uint32_t)USBx;
   fnsof = (USBx_DEVICE->DSTS & USB_OTG_DSTS_FNSOF) >> 8;
 
+  if (epnum == (AUDIO_IN_EP & 0xf)) {
+    AudioIn_IncompleteCounter++;
+  }
+
   if (tx_flag == 1U) {
     tx_flag = 0U;
     USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
@@ -818,7 +823,7 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,  uint8_t epnum){
 				}
 			}
 
-		USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, tmpbuf, AUDIO_OUT_PACKET_24B);
+		USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, (uint8_t *)tmpbuf, AUDIO_OUT_PACKET_24B);
 		}
 
 	return USBD_OK;
